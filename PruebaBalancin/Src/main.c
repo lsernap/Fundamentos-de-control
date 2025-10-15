@@ -6,7 +6,7 @@
  ******************************************************************************
  * @attention
  *
- * Copyright (c) 2024 STMicroelectronics.
+ * Copyright (c) 2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -16,14 +16,19 @@
  ******************************************************************************
  */
 
+#include <stm32f4xx.h>
 #include <stdint.h>
 
-#if !defined(__SOFT_FP__) && defined(__ARM_FP)
-  #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
-#endif
+/**
+ * Funcion principal del programa
+ */
 
-int main(void)
-{
+int main(void){
+
     /* Loop forever */
-	for(;;);
+	while(1){
+
+	}
+
+	return 0;
 }

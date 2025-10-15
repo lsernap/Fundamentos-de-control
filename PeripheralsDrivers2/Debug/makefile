@@ -9,7 +9,6 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include Startup/subdir.mk
 -include Src/subdir.mk
 -include objects.mk
 
@@ -33,53 +32,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := Basic_config
-BUILD_ARTIFACT_EXTENSION := elf
-BUILD_ARTIFACT_PREFIX :=
+BUILD_ARTIFACT_NAME := PeripheralsDrivers2
+BUILD_ARTIFACT_EXTENSION := a
+BUILD_ARTIFACT_PREFIX := lib
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
-EXECUTABLES += \
-Basic_config.elf \
-
-MAP_FILES += \
-Basic_config.map \
-
-SIZE_OUTPUT += \
-default.size.stdout \
-
-OBJDUMP_LIST += \
-Basic_config.list \
+ARCHIVES += \
+libPeripheralsDrivers2.a \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: Basic_config.elf secondary-outputs
+main-build: libPeripheralsDrivers2.a secondary-outputs
 
 # Tool invocations
-Basic_config.elf Basic_config.map: $(OBJS) $(USER_OBJS) /home/luciana/GitHub/MICP-repository/Basic_config/STM32F411RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Basic_config.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/luciana/GitHub/MICP-repository/Basic_config/STM32F411RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Basic_config.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+libPeripheralsDrivers2.a: $(OBJS) $(USER_OBJS) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-ar -r  "libPeripheralsDrivers2.a" @"objects.list" $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
-	@echo ' '
-
-default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-size  $(EXECUTABLES)
-	@echo 'Finished building: $@'
-	@echo ' '
-
-Basic_config.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "Basic_config.list"
-	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) Basic_config.elf Basic_config.list Basic_config.map default.size.stdout
+	-$(RM) libPeripheralsDrivers2.a
 	-@echo ' '
 
-secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)
+secondary-outputs:
 
 fail-specified-linker-script-missing:
 	@echo 'Error: Cannot find the specified linker script. Check the linker settings in the build configuration.'

@@ -32,31 +32,31 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := PeripheralsDrivers
+BUILD_ARTIFACT_NAME := PeripheralsDrivers2
 BUILD_ARTIFACT_EXTENSION := a
 BUILD_ARTIFACT_PREFIX := lib
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 ARCHIVES += \
-libPeripheralsDrivers.a \
+libPeripheralsDrivers2.a \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: libPeripheralsDrivers.a secondary-outputs
+main-build: libPeripheralsDrivers2.a secondary-outputs
 
 # Tool invocations
-libPeripheralsDrivers.a: $(OBJS) $(USER_OBJS) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-ar -r  "libPeripheralsDrivers.a" @"objects.list" $(USER_OBJS) $(LIBS)
+libPeripheralsDrivers2.a: $(OBJS) $(USER_OBJS) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-ar -r  "libPeripheralsDrivers2.a" @"objects.list" $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) libPeripheralsDrivers.a
+	-$(RM) libPeripheralsDrivers2.a
 	-@echo ' '
 
 secondary-outputs:
