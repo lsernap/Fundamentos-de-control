@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+//#include <arm_math.h>
 
 #include "gpio_driver_hal.h"
 #include "timer_driver_hal.h"
@@ -31,22 +32,80 @@
 #include "PwmDriver.h"
 #include "adc_driver_hal.h"
 
-//-------------------- definicion de los handlers necesarios en el programa --------------------//
-/* uso del USART 2 con los pines A2 y A3  que estan conectados directamente al cable usb */
-GPIO_Handler_t pinTx        = {0};   //PinA2
-GPIO_Handler_t pinRx        = {0};   //PinA3
+void initSystem(void);
 
-USART_Handler_t commSerial  = {0};
-Timer_Handler_t PruebaTimer = {0};
+//-------------------- definicion de los handlers necesarios en el programa --------------------//
+
+/* uso del USART 2 con los pines A2 y A3  que estan conectados directamente al cable usb */
+GPIO_Handler_t pinTx         = {0};   //PinA2
+GPIO_Handler_t pinRx         = {0};   //PinA3
+USART_Handler_t commSerial   = {0};
+Timer_Handler_t PruebaTimer  = {0};  //timer 5
 ADC_Config_t potenciometro1  = {0};
-//-------------------- definicion de las variables globales ------------------------------------//
-uint8_t sendMsg      = 0;
-uint16_t valor       = 0;
-uint8_t receivedChar = '\0';
-char bufferData[128] = {0};
+
+/* GPIO de salida de pwm para el motor*/
+GPIO_Handler_t motor          = {0}; //Pin A6
+PWM_Handler_t pwm_motor       = {0}; //Timer 3
+//-------------------- definicion de las variables  ------------------------------------//
+uint8_t sendMsg       = 0;
+uint16_t valor        = 0;
+uint16_t anguloT      = 10;  //el angulo varia entre 10° y 150°
+uint16_t anguloMed    = 0;
+uint16_t dutty_motor = 10;
+uint8_t receivedChar  = '\0';
+char bufferData[128]  = {0};
+
 
 int main(void){
-	/*Configuramos los pines del puerto serial */
+	initSystem();
+
+    /* Loop forever */
+	while(1){
+
+		if (receivedChar) {
+			if (receivedChar == 'p') {
+				usart_writeMsg(&commSerial, "Testing, Testing\n\r");
+			}
+			else if (receivedChar == 'n') {
+				sprintf(bufferData, "Set Point(Angulo): %d \n", anguloT);
+				usart_writeMsg(&commSerial, bufferData);
+			}
+			else if (receivedChar == 'w'){
+				if (anguloT < 150){
+					anguloT = anguloT + 5;
+					//updateDuttyCycle(&pwm_azul, dutty_motor);
+				}
+				else {
+					anguloT = 150;
+				}
+			}
+			receivedChar = '\0';
+		}
+	}
+
+	return 0;
+}
+/* funcion que atiende la interrupcion del usart */
+void usart2_RxCallback(void) {
+	receivedChar = usart_getRxData();
+}
+/* funcion que atiende la interrupcion del timer de prueba */
+void timer5_Callback(void){
+	adc_StartSingleConv();
+	sprintf(bufferData, "Angulo Medido: %d \n", anguloMed);
+	usart_writeMsg(&commSerial, bufferData);
+
+}
+/* funcion que atiende la interrupcion del adc */
+void adc_CompleteCallback(void) {
+	potenciometro1.adcData = adc_GetValue();
+	valor = potenciometro1.adcData;
+	anguloMed = valor;
+}
+
+
+void initSystem(void){
+/*-------------------Configuramos los pines del puerto serial ------------------*/
 	/* Pin sobre los que funciona el USART2 (TX)*/
 	pinTx.GPIOx = GPIOA;
 	pinTx.pinConfig.GPIO_PinNumber = PIN_2;
@@ -93,38 +152,23 @@ int main(void){
 	adc_ConfigSingleChannel(&potenciometro1);
 	adc_peripheralOnOFF(ADC_ON);
 
-    /* Loop forever */
-	while(1){
-
-		if (receivedChar) {
-			if (receivedChar == 'p') {
-				usart_writeMsg(&commSerial, "Testing, Testing\n\r");
-			}
-			else if (receivedChar == 'n') {
-				sprintf(bufferData, "Valor X es: %d \n", valor);
-				usart_writeMsg(&commSerial, bufferData);
-
-			}
-			receivedChar = '\0';
-		}
-	}
-
-	return 0;
-}
-/* funcion que atiende la interrupcion del usart */
-void usart2_RxCallback(void) {
-	receivedChar = usart_getRxData();
-}
-/* funcion que atiende la interrupcion del timer de prueba */
-void timer5_Callback(void){
-	adc_StartSingleConv();
-	sprintf(bufferData, "Valor X es: %d \n", valor);
-	usart_writeMsg(&commSerial, bufferData);
+/*-----------------Configuramos el pin para el Motor y su PWM-----------------*/
+    /* GPIO */
+    motor.GPIOx                              = GPIOA;
+    motor.pinConfig.GPIO_PinNumber           = PIN_6;
+    motor.pinConfig.GPIO_PinMode             = GPIO_MODE_ALTFN;
+    motor.pinConfig.GPIO_PinAltFunMode       = AF2;
+    motor.pinConfig.GPIO_PinOutputType       = GPIO_OTYPE_PUSHPULL;
+    motor.pinConfig.GPIO_PinOutputSpeed      = GPIO_OSPEED_MEDIUM;
+    motor.pinConfig.GPIO_PinPuPdControl      = GPIO_PUPDR_NOTHING;
+    gpio_Config(&motor);
+    /* PWM */
+    pwm_motor.ptrTIMx                               = TIM3;
+    pwm_motor.config.channel                        = PWM_CHANNEL_1;
+    pwm_motor.config.prescaler                      = 16;
+    pwm_motor.config.periodo                        = 20000;
+    pwm_motor.config.duttyCicle                     = 10;
+    pwm_Config(&pwm_motor);
+    startPwmSignal(&pwm_motor);
 
 }
-/* funcion que atiende la interrupcion del adc */
-void adc_CompleteCallback(void) {
-	potenciometro1.adcData = adc_GetValue();
-	valor = potenciometro1.adcData;
-}
-
