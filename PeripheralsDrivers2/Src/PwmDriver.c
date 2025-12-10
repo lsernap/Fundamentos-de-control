@@ -32,7 +32,7 @@ void pwm_Config(PWM_Handler_t *ptrPwmHandler){
 	pwm_mode(ptrPwmHandler, PWM_UP_COUNTER);
 
 	//Cargamos el limite del contador
-	ptrPwmHandler->ptrTIMx->ARR = ptrPwmHandler->config.periodo - 1;
+	//ptrPwmHandler->ptrTIMx->ARR = ptrPwmHandler->config.periodo - 1;
 
 	// reiniciamos el registro de counter
 	ptrPwmHandler -> ptrTIMx -> CNT = 0;
@@ -82,19 +82,19 @@ void setDuttyCycle(PWM_Handler_t *ptrPwmHandler){
 	//Como el dutty esta dado en porcentaje (%), entonces dividimos por 100
 	switch(ptrPwmHandler->config.channel){
 		case PWM_CHANNEL_1:{
-			ptrPwmHandler->ptrTIMx->CCR1 = (((ptrPwmHandler->config.periodo) * (ptrPwmHandler->config.duttyCicle))/PWM_DUTTY_100_PERCENT);
+			ptrPwmHandler->ptrTIMx->CCR1 = (ptrPwmHandler->config.duttyCicle);
 			break;
 		}
 		case PWM_CHANNEL_2: {
-			ptrPwmHandler->ptrTIMx->CCR2 = (((ptrPwmHandler->config.periodo) * (ptrPwmHandler->config.duttyCicle))/PWM_DUTTY_100_PERCENT);
+			ptrPwmHandler->ptrTIMx->CCR2 = (ptrPwmHandler->config.duttyCicle);
 			break;
 		}
 		case PWM_CHANNEL_3: {
-			ptrPwmHandler->ptrTIMx->CCR3 = (((ptrPwmHandler->config.periodo) * (ptrPwmHandler->config.duttyCicle))/PWM_DUTTY_100_PERCENT);
+			ptrPwmHandler->ptrTIMx->CCR3 = (ptrPwmHandler->config.duttyCicle);
 			break;
 		}
 		case PWM_CHANNEL_4: {
-			ptrPwmHandler->ptrTIMx->CCR4 = (((ptrPwmHandler->config.periodo) * (ptrPwmHandler->config.duttyCicle))/PWM_DUTTY_100_PERCENT);
+			ptrPwmHandler->ptrTIMx->CCR4 = (ptrPwmHandler->config.duttyCicle);
 			break;
 		}
 		default:{
@@ -207,7 +207,7 @@ void pwm_preLoad_bit(PWM_Handler_t *ptrPwmHandler){
 		}
 		case PWM_CHANNEL_3: {
 			// Activamos la comparacion en modo fast
-			ptrPwmHandler->ptrTIMx->CCMR1 |= TIM_CCMR2_OC3FE;
+			ptrPwmHandler->ptrTIMx->CCMR2 |= TIM_CCMR2_OC3FE;
 
 			// Activamos la funcionalidad de pre-load
 			ptrPwmHandler->ptrTIMx->CCMR2 |= TIM_CCMR2_OC3PE;
@@ -215,7 +215,7 @@ void pwm_preLoad_bit(PWM_Handler_t *ptrPwmHandler){
 		}
 		case PWM_CHANNEL_4: {
 			// Activamos la comparacion en modo fast
-			ptrPwmHandler->ptrTIMx->CCMR1 |= TIM_CCMR2_OC4FE;
+			ptrPwmHandler->ptrTIMx->CCMR2 |= TIM_CCMR2_OC4FE;
 
 			// Activamos la funcionalidad de pre-load
 			ptrPwmHandler->ptrTIMx->CCMR2 |=  TIM_CCMR2_OC4PE;

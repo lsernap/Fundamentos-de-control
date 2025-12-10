@@ -17,13 +17,14 @@
  */
 
 #include <stm32f4xx.h>
-#include <stdint.h>
+#include "stm32_assert.h"
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-//#include <arm_math.h>
+#include <arm_math.h>
+#include <float.h>
 
 #include "gpio_driver_hal.h"
 #include "timer_driver_hal.h"
@@ -33,6 +34,7 @@
 #include "adc_driver_hal.h"
 
 void initSystem(void);
+void Control_PI(void);
 
 //-------------------- definicion de los handlers necesarios en el programa --------------------//
 
@@ -41,16 +43,30 @@ GPIO_Handler_t pinTx         = {0};   //PinA2
 GPIO_Handler_t pinRx         = {0};   //PinA3
 USART_Handler_t commSerial   = {0};
 Timer_Handler_t PruebaTimer  = {0};  //timer 5
-ADC_Config_t potenciometro1  = {0};
+ADC_Config_t potenciometro1  = {0};  //Pin A4
 
 /* GPIO de salida de pwm para el motor*/
 GPIO_Handler_t motor          = {0}; //Pin A6
 PWM_Handler_t pwm_motor       = {0}; //Timer 3
+
 //-------------------- definicion de las variables  ------------------------------------//
+
+#define     TS_MS       50      // Periodo de muestreo en ms (50 ms)
+#define     TS_SEC      (float32_t)(TS_MS / 1000.0f) // Periodo de muestreo en segundos (0.05 s)
+
+float32_t Kp = 14.60f;     // Ganancia Proporcional (P)
+float32_t Ki = 2.2f;    // Ganancia Integral (I)
+
+// Variables de estado del PI
+float32_t error        = 0.0f; // Error actual
+float32_t error_a      = 0.0f; // Error anterior
+float32_t u_k          = 0.0f; // Salida del controlador actual (señal de control, Dutty Cycle)
+float32_t u_k_1        = 0.0f; // Salida del controlador anterior
+
 uint8_t sendMsg       = 0;
 uint16_t valor        = 0;
-uint16_t anguloT      = 10;  //el angulo varia entre 10° y 150°
-uint16_t anguloMed    = 0;
+uint16_t anguloT      = 90;  //el angulo varia entre 10° y 150°
+float32_t anguloMed    = 0;
 uint16_t dutty_motor = 10;
 uint8_t receivedChar  = '\0';
 char bufferData[128]  = {0};
@@ -64,19 +80,41 @@ int main(void){
 
 		if (receivedChar) {
 			if (receivedChar == 'p') {
-				usart_writeMsg(&commSerial, "Testing, Testing\n\r");
+				usart_writeMsg(&commSerial, "Testing, \n\r");
+				updateDuttyCycle(&pwm_motor,200);
 			}
 			else if (receivedChar == 'n') {
 				sprintf(bufferData, "Set Point(Angulo): %d \n", anguloT);
 				usart_writeMsg(&commSerial, bufferData);
+				sprintf(bufferData, "Angulo Medido: %.2f \n", anguloMed);
+				usart_writeMsg(&commSerial, bufferData);
+				sprintf(bufferData, "error: %.2f \n", error);
+				usart_writeMsg(&commSerial, bufferData);
+
+			}
+			else if (receivedChar == 'd'){
+				Kp= Kp - 0.1f;
+				sprintf(bufferData, "error: %.2f \n", Kp);
+				usart_writeMsg(&commSerial, bufferData);
+
 			}
 			else if (receivedChar == 'w'){
-				if (anguloT < 150){
+				if (anguloT < 100){
 					anguloT = anguloT + 5;
-					//updateDuttyCycle(&pwm_azul, dutty_motor);
 				}
 				else {
-					anguloT = 150;
+					anguloT = 100;
+				}
+			}
+			else if (receivedChar == 's'){
+				//Ki = Ki + 0.1f;
+				//sprintf(bufferData, "error: %.2f \n", Ki);
+				//usart_writeMsg(&commSerial, bufferData);
+				if (anguloT > 50){
+					anguloT = anguloT - 5;
+				}
+				else {
+					anguloT = 50;
 				}
 			}
 			receivedChar = '\0';
@@ -92,17 +130,49 @@ void usart2_RxCallback(void) {
 /* funcion que atiende la interrupcion del timer de prueba */
 void timer5_Callback(void){
 	adc_StartSingleConv();
-	sprintf(bufferData, "Angulo Medido: %d \n", anguloMed);
-	usart_writeMsg(&commSerial, bufferData);
+//	sprintf(bufferData, "Angulo Medido: %d \n", valor);
+//	usart_writeMsg(&commSerial, bufferData);
+
 
 }
 /* funcion que atiende la interrupcion del adc */
 void adc_CompleteCallback(void) {
 	potenciometro1.adcData = adc_GetValue();
 	valor = potenciometro1.adcData;
-	anguloMed = valor;
+	anguloMed = ((float32_t)valor * -(0.86f)) + 3090.0f ;
+	Control_PI(); // ejecutamos el algoritmo de control PI
 }
 
+void Control_PI(void){
+	//1. Calculo del error
+	error = (float32_t)anguloT - anguloMed;
+	//2. Calculo de la accion proporcional
+	float32_t terminoP = Kp * (error - error_a);
+	//3. Calculo de la accion integral
+	float32_t terminoI = Ki * TS_SEC * error;
+	//4. Incremento de la salida de control
+	float32_t delta_u = terminoP + terminoI;
+	//5.salida de control actual
+	u_k = u_k_1 + delta_u;
+	//6. Anti-windup (limitacion de la salida)
+	if (u_k > 20000.0f){
+		u_k = 20000.0f;
+	}
+	else if (u_k < 0.0f){
+		u_k = 0.0f;
+	}
+	//7. Asignar la salida de control al PWM
+	float32_t esc_dutty_float = 100.0f + (u_k / 20000.0f) * (200.0f - 100.0f); // Rango [100.0, 200.0]
+	dutty_motor = (uint16_t)esc_dutty_float;
+	updateDuttyCycle(&pwm_motor,dutty_motor);
+
+	// Asegurar los límites de hardware
+    if (dutty_motor < 100) dutty_motor = 100;
+	if (dutty_motor > 200) dutty_motor = 200;
+	//8. actualizar la variable para la proxima iteracion
+	error_a = error;
+	u_k_1 = u_k;
+}
 
 void initSystem(void){
 /*-------------------Configuramos los pines del puerto serial ------------------*/
@@ -134,16 +204,16 @@ void initSystem(void){
 	usart_Config(&commSerial);
 	usart_WriteChar(&commSerial, '\0');
 
-	/*Configuramos el timer para el toma de datos*/
+/*----------------Configuramos el timer para el toma de datos---------------*/
 	PruebaTimer.pTIMx                                = TIM5;
 	PruebaTimer.TIMx_Config.TIMx_Prescaler           = 16000;   // Genera incrementos de 1 ms
-	PruebaTimer.TIMx_Config.TIMx_Period              = 5000;      // De la mano con el prescaler
+	PruebaTimer.TIMx_Config.TIMx_Period              = TS_MS;      // De la mano con el prescaler
 	PruebaTimer.TIMx_Config.TIMx_mode                = TIMER_UP_COUNTER;
 	PruebaTimer.TIMx_Config.TIMx_InterruptEnable     = TIMER_INT_ENABLE;
 	timer_Config(&PruebaTimer);
 	timer_SetState(&PruebaTimer,TIMER_ON);
 
-	//Configuramos la conversion ADC//
+/*----------------Configuramos la conversion ADC--------------------*/
 	potenciometro1.channel = ADC_CHANNEL_4;
 	potenciometro1.resolution = ADC_RESOLUTION_12_BIT;
 	potenciometro1.dataAlignment = ADC_ALIGNMENT_RIGHT;
@@ -165,9 +235,9 @@ void initSystem(void){
     /* PWM */
     pwm_motor.ptrTIMx                               = TIM3;
     pwm_motor.config.channel                        = PWM_CHANNEL_1;
-    pwm_motor.config.prescaler                      = 16;
-    pwm_motor.config.periodo                        = 20000;
-    pwm_motor.config.duttyCicle                     = 10;
+    pwm_motor.config.prescaler                      = 160;
+    pwm_motor.config.periodo                        = 2000;
+    pwm_motor.config.duttyCicle                     = 200;
     pwm_Config(&pwm_motor);
     startPwmSignal(&pwm_motor);
 
